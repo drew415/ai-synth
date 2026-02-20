@@ -1,6 +1,7 @@
 import type { SynthParams } from '../state/params'
 import { DEFAULT_PARAMS } from '../state/params'
 import { PolySynth } from './PolySynth'
+import { createFxRack, type FxRack } from './fx/FxRack'
 import { smoothParam } from './dsp/helpers'
 
 /**
@@ -9,8 +10,8 @@ import { smoothParam } from './dsp/helpers'
 class AudioEngineClass {
   private ctx: AudioContext | null = null
   private synth: PolySynth | null = null
+  private fxRack: FxRack | null = null
   private masterGain: GainNode | null = null
-  private limiter: DynamicsCompressorNode | null = null
   private params: SynthParams = { ...DEFAULT_PARAMS }
   private initialized = false
 
@@ -27,24 +28,17 @@ class AudioEngineClass {
       await this.ctx.resume()
     }
 
-    // Create master chain: synth -> limiter -> masterGain -> destination
+    // Create master gain
     this.masterGain = this.ctx.createGain()
     this.masterGain.gain.value = this.params.masterVolume
-
-    // Soft limiter to prevent clipping
-    this.limiter = this.ctx.createDynamicsCompressor()
-    this.limiter.threshold.value = -3
-    this.limiter.knee.value = 6
-    this.limiter.ratio.value = 12
-    this.limiter.attack.value = 0.003
-    this.limiter.release.value = 0.1
-
-    // Connect master chain
-    this.limiter.connect(this.masterGain)
     this.masterGain.connect(this.ctx.destination)
 
+    // Create FX rack
+    this.fxRack = createFxRack(this.ctx, this.params.fx)
+    this.fxRack.output.connect(this.masterGain)
+
     // Create synth
-    this.synth = new PolySynth(this.ctx, this.params, this.limiter)
+    this.synth = new PolySynth(this.ctx, this.params, this.fxRack.input)
 
     this.initialized = true
   }
@@ -96,6 +90,10 @@ class AudioEngineClass {
       this.synth.updateParams(this.params)
     }
 
+    if (this.fxRack) {
+      this.fxRack.updateParams(this.params.fx)
+    }
+
     if (this.masterGain && this.ctx) {
       smoothParam(this.masterGain.gain, this.params.masterVolume, this.ctx)
     }
@@ -141,13 +139,13 @@ class AudioEngineClass {
    */
   dispose(): void {
     this.synth?.dispose()
+    this.fxRack?.dispose()
     this.masterGain?.disconnect()
-    this.limiter?.disconnect()
     this.ctx?.close()
 
     this.synth = null
+    this.fxRack = null
     this.masterGain = null
-    this.limiter = null
     this.ctx = null
     this.initialized = false
   }

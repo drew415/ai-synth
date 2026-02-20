@@ -5,6 +5,10 @@ import { Keyboard } from './ui/keyboard/Keyboard'
 import { OscillatorPanel } from './ui/synth/OscillatorPanel'
 import { EnvelopePanel } from './ui/synth/EnvelopePanel'
 import { FilterPanel } from './ui/synth/FilterPanel'
+import { LFOPanel } from './ui/synth/LFOPanel'
+import { FXPanel } from './ui/synth/FXPanel'
+import { MIDIPanel } from './ui/synth/MIDIPanel'
+import { PresetPanel } from './ui/synth/PresetPanel'
 import { Panel } from './ui/components/Panel'
 import { Knob } from './ui/components/Knob'
 import { Toggle } from './ui/components/Toggle'
@@ -26,6 +30,12 @@ function App() {
       AudioEngine.setParams(next)
       return next
     })
+  }, [])
+
+  // Load preset (replaces all params)
+  const handleLoadPreset = useCallback((presetParams: SynthParams) => {
+    setParams(presetParams)
+    AudioEngine.setParams(presetParams)
   }, [])
 
   // Deep param updates for nested objects
@@ -85,6 +95,27 @@ function App() {
     [params.unison, updateParams]
   )
 
+  const updateLFO1 = useCallback(
+    (updates: Partial<SynthParams['lfo1']>) => {
+      updateParams({ lfo1: { ...params.lfo1, ...updates } })
+    },
+    [params.lfo1, updateParams]
+  )
+
+  const updateLFO2 = useCallback(
+    (updates: Partial<SynthParams['lfo2']>) => {
+      updateParams({ lfo2: { ...params.lfo2, ...updates } })
+    },
+    [params.lfo2, updateParams]
+  )
+
+  const updateFX = useCallback(
+    (updates: Partial<SynthParams['fx']>) => {
+      updateParams({ fx: { ...params.fx, ...updates } })
+    },
+    [params.fx, updateParams]
+  )
+
   // Note handlers
   const handleNoteOn = useCallback(
     (note: number, velocity: number) => {
@@ -116,7 +147,13 @@ function App() {
 
   if (!isInitialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6">
+        <h1 className="text-4xl font-bold text-[var(--text-primary)]">AI Synth</h1>
+        <p className="text-[var(--text-secondary)] text-center max-w-md">
+          A polyphonic subtractive synthesizer built with Web Audio API.
+          <br />
+          Use your keyboard (A-L, W-P) or connect a MIDI controller.
+        </p>
         <button
           onClick={handleInit}
           className="px-8 py-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)]
@@ -132,7 +169,7 @@ function App() {
     <div className="min-h-screen p-4 md:p-6">
       <div className="max-w-6xl mx-auto space-y-4">
         {/* Header */}
-        <header className="flex items-center justify-between">
+        <header className="flex items-center justify-between flex-wrap gap-4">
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">AI Synth</h1>
           <div className="flex items-center gap-4">
             <Knob
@@ -152,6 +189,12 @@ function App() {
             </button>
           </div>
         </header>
+
+        {/* Presets & MIDI */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <PresetPanel currentParams={params} onLoadPreset={handleLoadPreset} />
+          <MIDIPanel onNoteOn={handleNoteOn} onNoteOff={handleNoteOff} />
+        </div>
 
         {/* Main synth controls */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -235,7 +278,13 @@ function App() {
           <EnvelopePanel title="Filter Envelope" params={params.filterEnv} onChange={updateFilterEnv} />
         </div>
 
-        {/* Glide */}
+        {/* LFOs */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <LFOPanel title="LFO 1" params={params.lfo1} onChange={updateLFO1} />
+          <LFOPanel title="LFO 2" params={params.lfo2} onChange={updateLFO2} />
+        </div>
+
+        {/* Performance */}
         <Panel title="Performance">
           <div className="flex gap-4">
             <Knob
@@ -258,6 +307,9 @@ function App() {
             />
           </div>
         </Panel>
+
+        {/* FX */}
+        <FXPanel params={params.fx} onChange={updateFX} />
 
         {/* Keyboard */}
         <Panel title="Keyboard">
